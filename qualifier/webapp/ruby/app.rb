@@ -1,6 +1,4 @@
 require 'sinatra/base'
-require 'json'
-require 'mysql2-cs-bind'
 require 'digest/sha2'
 require 'dalli'
 require 'rack/session/dalli'
@@ -8,17 +6,7 @@ require 'erubis'
 require 'tempfile'
 require 'redcarpet'
 
-def connect_mysql
-  config = JSON.parse(IO.read(File.dirname(__FILE__) + "/../config/#{ ENV['ISUCON_ENV'] || 'local' }.json"))['database']
-  Mysql2::Client.new(
-    :host => config['host'],
-    :port => config['port'],
-    :username => config['username'],
-    :password => config['password'],
-    :database => config['dbname'],
-    :reconnect => true,
-  )
-end
+require_relative 'lib'
 
 class Isucon3App < Sinatra::Base
   $stdout.sync = true
@@ -28,7 +16,7 @@ class Isucon3App < Sinatra::Base
   }
 
   configure do
-    mysql = connect_mysql
+    mysql = Util.connect_mysql
 
     $users     = {}
     $usernames = {}
@@ -44,7 +32,7 @@ class Isucon3App < Sinatra::Base
     set :erb, :escape_html => true
 
     def connection
-      $mysql ||= connect_mysql
+      $mysql ||= Util.connect_mysql
     end
 
     def get_user
