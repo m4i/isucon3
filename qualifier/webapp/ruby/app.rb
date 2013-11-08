@@ -76,18 +76,10 @@ class Isucon3App < Sinatra::Base
     user  = get_user
 
     total = mysql.query("SELECT count(*) AS c FROM memos WHERE is_private=0").first["c"]
-    memos = mysql.query("SELECT id, user, created_at FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100")
-
-    cache_keys = []
-    memos = memos.map do |row|
-      cache_keys << Util.memo_header_cache_key(row['id'])
+    memos = mysql.query("SELECT id, user, header, created_at FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100")
+    memos.each do |row|
       row["username"] = $users[row['user']]['username']
-      row
     end
-    $cache.get_multi(*cache_keys).each_value.with_index do |header, index|
-      memos[index]['header'] = header
-    end
-
     erb :index, :layout => :base, :locals => {
       :memos => memos,
       :page  => 0,
@@ -102,21 +94,13 @@ class Isucon3App < Sinatra::Base
 
     page  = params["page"].to_i
     total = mysql.xquery('SELECT count(*) AS c FROM memos WHERE is_private=0').first["c"]
-    memos = mysql.xquery("SELECT id, user, created_at FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100 OFFSET #{page * 100}")
+    memos = mysql.xquery("SELECT id, user, header, created_at FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100 OFFSET #{page * 100}")
     if memos.count == 0
       halt 404, "404 Not Found"
     end
-
-    cache_keys = []
-    memos = memos.map do |row|
-      cache_keys << Util.memo_header_cache_key(row['id'])
+    memos.each do |row|
       row["username"] = $users[row['user']]['username']
-      row
     end
-    $cache.get_multi(*cache_keys).each_value.with_index do |header, index|
-      memos[index]['header'] = header
-    end
-
     erb :index, :layout => :base, :locals => {
       :memos => memos,
       :page  => page,
@@ -164,17 +148,7 @@ class Isucon3App < Sinatra::Base
     user  = get_user
     require_user(user)
 
-    memos = mysql.xquery('SELECT id, is_private, created_at FROM memos WHERE user=? ORDER BY created_at DESC', user["id"])
-
-    cache_keys = []
-    memos = memos.map do |row|
-      cache_keys << Util.memo_header_cache_key(row['id'])
-      row
-    end
-    $cache.get_multi(*cache_keys).each_value.with_index do |header, index|
-      memos[index]['header'] = header
-    end
-
+    memos = mysql.xquery('SELECT id, header, is_private, created_at FROM memos WHERE user=? ORDER BY created_at DESC', user["id"])
     erb :mypage, :layout => :base, :locals => {
       :user  => user,
       :memos => memos,
@@ -229,14 +203,14 @@ class Isucon3App < Sinatra::Base
     anti_csrf
 
     mysql.xquery(
-      'INSERT INTO memos (user, content, is_private, created_at) VALUES (?, ?, ?, ?)',
+      'INSERT INTO memos (user, content, header, is_private, created_at) VALUES (?, ?, ?, ?, ?)',
       user["id"],
       params["content"],
+      Util.memo_header(params['content']),
       params["is_private"].to_i,
       Time.now,
     )
     memo_id = mysql.last_id
-    Util.cache_memo_header(memo_id, params['content'])
     redirect "/memo/#{memo_id}"
   end
 

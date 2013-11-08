@@ -13,9 +13,9 @@ puts Benchmark.realtime {
   $cache.flush_all
 }
 
-puts 'cache memos:header'
-puts Benchmark.realtime {
-  $mysql.xquery('SELECT id, content FROM memos').each do |row|
-    Util.cache_memo_header(row['id'], row['content'])
-  end
-}
+#puts 'cache memos:header'
+#puts Benchmark.realtime {
+#  $mysql.xquery('SELECT id, content FROM memos').each do |row|
+#    Util.cache_memo_header(row['id'], row['content'])
+#  end
+#}

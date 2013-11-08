@@ -4,5 +4,7 @@ set -e
 
 ISUCON_HOME=/home/isucon
 
+time mysql -uisucon isucon < $ISUCON_HOME/webapp/config/init.sql
+
 cd $ISUCON_HOME/webapp/ruby
 $ISUCON_HOME/env.sh bundle exec $ISUCON_HOME/webapp/ruby/init.rb
