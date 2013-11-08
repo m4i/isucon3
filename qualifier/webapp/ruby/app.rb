@@ -8,6 +8,18 @@ require 'erubis'
 require 'tempfile'
 require 'redcarpet'
 
+def connect_mysql
+  config = JSON.parse(IO.read(File.dirname(__FILE__) + "/../config/#{ ENV['ISUCON_ENV'] || 'local' }.json"))['database']
+  Mysql2::Client.new(
+    :host => config['host'],
+    :port => config['port'],
+    :username => config['username'],
+    :password => config['password'],
+    :database => config['dbname'],
+    :reconnect => true,
+  )
+end
+
 class Isucon3App < Sinatra::Base
   $stdout.sync = true
   use Rack::Session::Dalli, {
@@ -19,16 +31,7 @@ class Isucon3App < Sinatra::Base
     set :erb, :escape_html => true
 
     def connection
-      config = JSON.parse(IO.read(File.dirname(__FILE__) + "/../config/#{ ENV['ISUCON_ENV'] || 'local' }.json"))['database']
-      return $mysql if $mysql
-      $mysql = Mysql2::Client.new(
-        :host => config['host'],
-        :port => config['port'],
-        :username => config['username'],
-        :password => config['password'],
-        :database => config['dbname'],
-        :reconnect => true,
-      )
+      $mysql ||= connect_mysql
     end
 
     def get_user
