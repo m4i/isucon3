@@ -164,7 +164,17 @@ class Isucon3App < Sinatra::Base
     user  = get_user
     require_user(user)
 
-    memos = mysql.xquery('SELECT id, content, is_private, created_at, updated_at FROM memos WHERE user=? ORDER BY created_at DESC', user["id"])
+    memos = mysql.xquery('SELECT id, is_private, created_at, updated_at FROM memos WHERE user=? ORDER BY created_at DESC', user["id"])
+
+    cache_keys = []
+    memos = memos.map do |row|
+      cache_keys << Util.memo_header_cache_key(row['id'])
+      row
+    end
+    $cache.get_multi(*cache_keys).each_value.with_index do |header, index|
+      memos[index]['header'] = header
+    end
+
     erb :mypage, :layout => :base, :locals => {
       :user  => user,
       :memos => memos,
