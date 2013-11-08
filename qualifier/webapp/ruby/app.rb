@@ -12,15 +12,12 @@ require_relative 'lib'
 class Isucon3App < Sinatra::Base
   $stdout.sync = true
 
-  $cache = Dalli::Client.new('localhost:11211')
   use Rack::Session::Dalli, {
     :key => 'isucon_session',
-    :cache => $cache,
+    :cache => Dalli::Client.new('localhost:11211'),
   }
 
   configure do
-    $redis = Redis.new(driver: :hiredis)
-
     mysql = Util.connect_mysql
 
     $users     = {}
@@ -35,6 +32,10 @@ class Isucon3App < Sinatra::Base
 
   helpers do
     set :erb, :escape_html => true
+
+    def redis
+      $redis ||= Redis.new(driver: :hiredis)
+    end
 
     def connection
       $mysql ||= Util.connect_mysql
@@ -78,7 +79,7 @@ class Isucon3App < Sinatra::Base
     mysql = connection
     user  = get_user
 
-    total = $cache.get('memos:count')
+    total = redis.llen('memo:public:ids')
     memos = mysql.query("SELECT id, user, header, created_at FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100")
     memos.each do |row|
       row["username"] = $users[row['user']]['username']
@@ -96,7 +97,7 @@ class Isucon3App < Sinatra::Base
     user  = get_user
 
     page  = params["page"].to_i
-    total = $cache.get('memos:count')
+    total = redis.llen('memo:public:ids')
     memos = mysql.xquery("SELECT id, user, header, created_at FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100 OFFSET #{page * 100}")
     if memos.count == 0
       halt 404, "404 Not Found"
@@ -215,8 +216,7 @@ class Isucon3App < Sinatra::Base
     )
     memo_id = mysql.last_id
     if params["is_private"].to_i == 0
-      $cache.incr('memos:count')
-      $redis.lpush('memo:public:ids', memo_id)
+      redis.lpush('memo:public:ids', memo_id)
     end
     redirect "/memo/#{memo_id}"
   end
