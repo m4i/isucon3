@@ -51,7 +51,7 @@ class Isucon3App < Sinatra::Base
       mysql = connection
       user_id = session["user_id"]
       if user_id
-        user = mysql.xquery("SELECT * FROM users WHERE id=?", user_id).first
+        user = $users[user_id]
         headers "Cache-Control" => "private"
       end
       return user || {}
@@ -95,7 +95,7 @@ class Isucon3App < Sinatra::Base
     total = mysql.query("SELECT count(*) AS c FROM memos WHERE is_private=0").first["c"]
     memos = mysql.query("SELECT * FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100")
     memos.each do |row|
-      row["username"] = mysql.xquery("SELECT username FROM users WHERE id=?", row["user"]).first["username"]
+      row["username"] = $users[row['user']]['username']
     end
     erb :index, :layout => :base, :locals => {
       :memos => memos,
@@ -116,7 +116,7 @@ class Isucon3App < Sinatra::Base
       halt 404, "404 Not Found"
     end
     memos.each do |row|
-      row["username"] = mysql.xquery("SELECT username FROM users WHERE id=?", row["user"]).first["username"]
+      row["username"] = $users[row['user']]['username']
     end
     erb :index, :layout => :base, :locals => {
       :memos => memos,
@@ -147,7 +147,7 @@ class Isucon3App < Sinatra::Base
 
     username = params[:username]
     password = params[:password]
-    user = mysql.xquery('SELECT id, username, password, salt FROM users WHERE username=?', username).first
+    user = $users[$usernames[username]]
     if user && user["password"] == Digest::SHA256.hexdigest(user["salt"] + password)
       session.clear
       session["user_id"] = user["id"]
@@ -185,7 +185,7 @@ class Isucon3App < Sinatra::Base
         halt 404, "404 Not Found"
       end
     end
-    memo["username"] = mysql.xquery('SELECT username FROM users WHERE id=?', memo["user"]).first["username"]
+    memo["username"] = $users[memo['user']]['username']
     memo["content_html"] = gen_markdown(memo["content"])
     if user["id"] == memo["user"]
       cond = ""
