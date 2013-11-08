@@ -8,6 +8,18 @@ require 'erubis'
 require 'tempfile'
 require 'redcarpet'
 
+def connect_mysql
+  config = JSON.parse(IO.read(File.dirname(__FILE__) + "/../config/#{ ENV['ISUCON_ENV'] || 'local' }.json"))['database']
+  Mysql2::Client.new(
+    :host => config['host'],
+    :port => config['port'],
+    :username => config['username'],
+    :password => config['password'],
+    :database => config['dbname'],
+    :reconnect => true,
+  )
+end
+
 class Isucon3App < Sinatra::Base
   $stdout.sync = true
   use Rack::Session::Dalli, {
@@ -15,27 +27,31 @@ class Isucon3App < Sinatra::Base
     :cache => Dalli::Client.new('localhost:11211')
   }
 
+  configure do
+    mysql = connect_mysql
+
+    $users     = {}
+    $usernames = {}
+    mysql.xquery('SELECT id, username, password, salt FROM users').each do |row|
+      $users[row['id']]           = row
+      $usernames[row['username']] = row['id']
+    end
+
+    mysql.close
+  end
+
   helpers do
     set :erb, :escape_html => true
 
     def connection
-      config = JSON.parse(IO.read(File.dirname(__FILE__) + "/../config/#{ ENV['ISUCON_ENV'] || 'local' }.json"))['database']
-      return $mysql if $mysql
-      $mysql = Mysql2::Client.new(
-        :host => config['host'],
-        :port => config['port'],
-        :username => config['username'],
-        :password => config['password'],
-        :database => config['dbname'],
-        :reconnect => true,
-      )
+      $mysql ||= connect_mysql
     end
 
     def get_user
       mysql = connection
       user_id = session["user_id"]
       if user_id
-        user = mysql.xquery("SELECT * FROM users WHERE id=?", user_id).first
+        user = $users[user_id]
         headers "Cache-Control" => "private"
       end
       return user || {}
@@ -79,7 +95,7 @@ class Isucon3App < Sinatra::Base
     total = mysql.query("SELECT count(*) AS c FROM memos WHERE is_private=0").first["c"]
     memos = mysql.query("SELECT * FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100")
     memos.each do |row|
-      row["username"] = mysql.xquery("SELECT username FROM users WHERE id=?", row["user"]).first["username"]
+      row["username"] = $users[row['user']]['username']
     end
     erb :index, :layout => :base, :locals => {
       :memos => memos,
@@ -100,7 +116,7 @@ class Isucon3App < Sinatra::Base
       halt 404, "404 Not Found"
     end
     memos.each do |row|
-      row["username"] = mysql.xquery("SELECT username FROM users WHERE id=?", row["user"]).first["username"]
+      row["username"] = $users[row['user']]['username']
     end
     erb :index, :layout => :base, :locals => {
       :memos => memos,
@@ -131,7 +147,7 @@ class Isucon3App < Sinatra::Base
 
     username = params[:username]
     password = params[:password]
-    user = mysql.xquery('SELECT id, username, password, salt FROM users WHERE username=?', username).first
+    user = $users[$usernames[username]]
     if user && user["password"] == Digest::SHA256.hexdigest(user["salt"] + password)
       session.clear
       session["user_id"] = user["id"]
@@ -169,7 +185,7 @@ class Isucon3App < Sinatra::Base
         halt 404, "404 Not Found"
       end
     end
-    memo["username"] = mysql.xquery('SELECT username FROM users WHERE id=?', memo["user"]).first["username"]
+    memo["username"] = $users[memo['user']]['username']
     memo["content_html"] = gen_markdown(memo["content"])
     if user["id"] == memo["user"]
       cond = ""
