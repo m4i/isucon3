@@ -27,6 +27,19 @@ class Isucon3App < Sinatra::Base
     :cache => Dalli::Client.new('localhost:11211')
   }
 
+  configure do
+    mysql = connect_mysql
+
+    $users     = {}
+    $usernames = {}
+    mysql.xquery('SELECT id, username, password, salt FROM users').each do |row|
+      $users[row['id']]           = row
+      $usernames[row['username']] = row['id']
+    end
+
+    mysql.close
+  end
+
   helpers do
     set :erb, :escape_html => true
 
