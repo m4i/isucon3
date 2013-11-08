@@ -80,7 +80,9 @@ class Isucon3App < Sinatra::Base
     user  = get_user
 
     total = redis.llen('memo:public:ids')
-    memos = mysql.query("SELECT id, user, header, created_at FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100")
+    memo_ids = redis.lrange('memo:public:ids', 0, 100 - 1)
+    memos = memo_ids.empty? ? [] :
+      mysql.xquery('SELECT id, user, header, created_at FROM memos WHERE id IN (?) ORDER BY created_at DESC, id DESC', memo_ids)
     memos.each do |row|
       row["username"] = $users[row['user']]['username']
     end
@@ -98,7 +100,9 @@ class Isucon3App < Sinatra::Base
 
     page  = params["page"].to_i
     total = redis.llen('memo:public:ids')
-    memos = mysql.xquery("SELECT id, user, header, created_at FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100 OFFSET #{page * 100}")
+    memo_ids = redis.lrange('memo:public:ids', page * 100, (page + 1) * 100 - 1)
+    memos = memo_ids.empty? ? [] :
+      mysql.xquery('SELECT id, user, header, created_at FROM memos WHERE id IN (?) ORDER BY created_at DESC, id DESC', memo_ids)
     if memos.count == 0
       halt 404, "404 Not Found"
     end
