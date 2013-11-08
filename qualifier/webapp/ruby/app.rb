@@ -5,6 +5,7 @@ require 'rack/session/dalli'
 require 'erubis'
 require 'tempfile'
 require 'redcarpet'
+require 'redis'
 
 require_relative 'lib'
 
@@ -18,6 +19,8 @@ class Isucon3App < Sinatra::Base
   }
 
   configure do
+    $redis = Redis.new(driver: :hiredis)
+
     mysql = Util.connect_mysql
 
     $users     = {}
@@ -210,10 +213,11 @@ class Isucon3App < Sinatra::Base
       params["is_private"].to_i,
       Time.now,
     )
-    if params["is_private"].to_i == 1
-      $cache.incr('memos:count')
-    end
     memo_id = mysql.last_id
+    if params["is_private"].to_i == 0
+      $cache.incr('memos:count')
+      $redis.lpush('memo:public:ids', memo_id)
+    end
     redirect "/memo/#{memo_id}"
   end
 
