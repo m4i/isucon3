@@ -10,9 +10,11 @@ require_relative 'lib'
 
 class Isucon3App < Sinatra::Base
   $stdout.sync = true
+
+  $cache = Dalli::Client.new('localhost:11211')
   use Rack::Session::Dalli, {
     :key => 'isucon_session',
-    :cache => Dalli::Client.new('localhost:11211')
+    :cache => $cache,
   }
 
   configure do
@@ -208,6 +210,7 @@ class Isucon3App < Sinatra::Base
       Time.now,
     )
     memo_id = mysql.last_id
+    Util.cache_memo_header(memo_id, params['content'])
     redirect "/memo/#{memo_id}"
   end
 
