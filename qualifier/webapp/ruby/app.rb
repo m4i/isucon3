@@ -164,7 +164,7 @@ class Isucon3App < Sinatra::Base
     user  = get_user
     require_user(user)
 
-    memos = mysql.xquery('SELECT id, is_private, created_at, updated_at FROM memos WHERE user=? ORDER BY created_at DESC', user["id"])
+    memos = mysql.xquery('SELECT id, is_private, created_at FROM memos WHERE user=? ORDER BY created_at DESC', user["id"])
 
     cache_keys = []
     memos = memos.map do |row|
@@ -185,7 +185,7 @@ class Isucon3App < Sinatra::Base
     mysql = connection
     user  = get_user
 
-    memo = mysql.xquery('SELECT id, user, content, is_private, created_at, updated_at FROM memos WHERE id=?', params[:memo_id]).first
+    memo = mysql.xquery('SELECT id, user, content, is_private, created_at FROM memos WHERE id=?', params[:memo_id]).first
     unless memo
       halt 404, "404 Not Found"
     end
