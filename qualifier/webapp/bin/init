@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -e
+
+ISUCON_HOME=/home/isucon
+
+cd $ISUCON_HOME/webapp/ruby
+$ISUCON_HOME/env.sh bundle exec $ISUCON_HOME/webapp/ruby/init.rb

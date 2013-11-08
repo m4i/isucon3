@@ -15,4 +15,20 @@ module Util
       :reconnect => true,
     )
   end
+
+  def cache_memo_header(memo_id, content)
+    cache_key = memo_header_cache_key(memo_id)
+    header    = memo_header(content)
+    $cache.set(cache_key, header)
+  end
+
+  def memo_header_cache_key(memo_id)
+    "memos:header:#{memo_id}"
+  end
+
+  private
+
+  def memo_header(content)
+    content.each_line.first.chomp
+  end
 end
