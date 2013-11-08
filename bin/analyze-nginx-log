@@ -1,0 +1,56 @@
+#!/usr/bin/env ruby
+
+require 'yaml'
+
+unless ARGV.length == 1
+  $stderr.puts "Usage #{File.basename(__FILE__)} <logfile>"
+  exit 1
+end
+
+
+module LTSV
+  extend self
+  def parse_line(line)
+    line.strip.split("\t").each_with_object({}) do |pair, hash|
+      key, value = pair.split(':', 2)
+      hash[key.to_sym] = value
+    end
+  end
+end
+
+
+summary = {}
+
+IO.foreach(ARGV.first) do |line|
+  line = LTSV.parse_line(line)
+
+  path    = line[:uri].gsub(/\d+/, '\\d+')
+  method  = line[:method]
+  status  = line[:status].to_i
+  runtime = line[:runtime].to_f
+
+  key = "#{method} #{path}"
+
+  action_hash = summary[key]        ||= {}
+  status_hash = action_hash[status] ||= {}
+  status_hash[:count] ||= 0
+  status_hash[:count] +=  1
+  status_hash[:total] ||= 0
+  status_hash[:total] +=  runtime
+end
+
+
+puts '%9s %9s %9s %9s %9s %s' % %w( total avg count status method path )
+puts '-' * 79
+
+summary.sort_by {|k, v| - v.first.last[:total] }.each do |key, statuses|
+  statuses.sort_by {|k, v| - v[:total] }.each do |status, data|
+    puts '%9.3f %9.3f %9d %9s %9s %s' % [
+      data[:total],
+      data[:total] / data[:count],
+      data[:count],
+      status,
+      *key.split(' ', 2),
+    ]
+  end
+end
