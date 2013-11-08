@@ -2,9 +2,11 @@
 
 require 'benchmark'
 require 'dalli'
+require 'redis'
 
 require_relative 'lib'
 
+$redis = Redis.new(driver: :hiredis)
 $cache = Dalli::Client.new('localhost:11211')
 $mysql = Util.connect_mysql
 
@@ -21,6 +23,16 @@ puts Benchmark.realtime {
     nil,
     raw: true,
   )
+}
+
+puts 'cache memos order'
+puts Benchmark.realtime {
+  sql = 'SELECT id FROM memos WHERE is_private = 0 ORDER BY created_at DESC, id DESC'
+  memo_ids = $mysql.query(sql).map do |row|
+    row['id']
+  end
+  $redis.del('memo:public:ids')
+  $redis.rpush('memo:public:ids', memo_ids)
 }
 
 #puts 'cache memos:header'
