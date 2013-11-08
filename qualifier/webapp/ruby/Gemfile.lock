@@ -8,7 +8,6 @@ GIT
 GEM
   remote: http://rubygems.org/
   specs:
-    dalli (2.6.4)
     dotenv (0.9.0)
     erubis (2.7.0)
     foreman (0.63.0)
@@ -44,7 +43,6 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  dalli (= 2.6.4)
   erubis (= 2.7.0)
   foreman (= 0.63.0)
   hiredis (= 0.4.5)

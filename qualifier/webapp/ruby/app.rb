@@ -1,7 +1,5 @@
 require 'sinatra/base'
 require 'digest/sha2'
-require 'dalli'
-require 'rack/session/dalli'
 require 'erubis'
 require 'tempfile'
 require 'redcarpet'
@@ -12,9 +10,9 @@ require_relative 'lib'
 class Isucon3App < Sinatra::Base
   $stdout.sync = true
 
-  use Rack::Session::Dalli, {
+  use Rack::Session::Cookie, {
     :key => 'isucon_session',
-    :cache => Dalli::Client.new('localhost:11211'),
+    :secret => 'secret',
   }
 
   configure do

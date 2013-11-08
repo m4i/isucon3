@@ -1,19 +1,12 @@
 #!/usr/bin/env ruby
 
 require 'benchmark'
-require 'dalli'
 require 'redis'
 
 require_relative 'lib'
 
 $redis = Redis.new(driver: :hiredis)
-$cache = Dalli::Client.new('localhost:11211')
 $mysql = Util.connect_mysql
-
-puts 'clear cache'
-puts Benchmark.realtime {
-  $cache.flush_all
-}
 
 puts 'cache memos order'
 puts Benchmark.realtime {
