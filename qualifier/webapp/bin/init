@@ -4,7 +4,23 @@ set -e
 
 ISUCON_HOME=/home/isucon
 
+MYSQL_LOGDIR=/var/lib/mysql
+MYSQL_LOGS=( mysql-slow.log )
+
+
 time mysql -uisucon isucon < $ISUCON_HOME/webapp/config/init.sql
+
+
+timestamp=$(cat /tmp/benchmark-timestamp)
+
+for log_file in ${MYSQL_LOGS[@]}; do
+  log_path=$MYSQL_LOGDIR/$log_file
+  if [[ -s $log_path ]]; then
+    sudo mv $log_path{,.bak-$timestamp}
+  fi
+done
+mysqladmin -uroot -proot flush-logs
+
 
 cd $ISUCON_HOME/webapp/ruby
 $ISUCON_HOME/env.sh bundle exec $ISUCON_HOME/webapp/ruby/init.rb
