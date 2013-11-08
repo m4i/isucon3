@@ -5,16 +5,16 @@ require 'rack/session/dalli'
 require 'erubis'
 require 'tempfile'
 require 'redcarpet'
+require 'redis'
 
 require_relative 'lib'
 
 class Isucon3App < Sinatra::Base
   $stdout.sync = true
 
-  $cache = Dalli::Client.new('localhost:11211')
   use Rack::Session::Dalli, {
     :key => 'isucon_session',
-    :cache => $cache,
+    :cache => Dalli::Client.new('localhost:11211'),
   }
 
   configure do
@@ -32,6 +32,10 @@ class Isucon3App < Sinatra::Base
 
   helpers do
     set :erb, :escape_html => true
+
+    def redis
+      $redis ||= Redis.new(driver: :hiredis)
+    end
 
     def connection
       $mysql ||= Util.connect_mysql
@@ -75,8 +79,10 @@ class Isucon3App < Sinatra::Base
     mysql = connection
     user  = get_user
 
-    total = $cache.get('memos:count')
-    memos = mysql.query("SELECT id, user, header, created_at FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100")
+    total = redis.llen('memo:public:ids')
+    memo_ids = redis.lrange('memo:public:ids', 0, 100 - 1)
+    memos = memo_ids.empty? ? [] :
+      mysql.xquery('SELECT id, user, header, created_at FROM memos WHERE id IN (?) ORDER BY created_at DESC, id DESC', memo_ids)
     memos.each do |row|
       row["username"] = $users[row['user']]['username']
     end
@@ -93,8 +99,10 @@ class Isucon3App < Sinatra::Base
     user  = get_user
 
     page  = params["page"].to_i
-    total = $cache.get('memos:count')
-    memos = mysql.xquery("SELECT id, user, header, created_at FROM memos WHERE is_private=0 ORDER BY created_at DESC, id DESC LIMIT 100 OFFSET #{page * 100}")
+    total = redis.llen('memo:public:ids')
+    memo_ids = redis.lrange('memo:public:ids', page * 100, (page + 1) * 100 - 1)
+    memos = memo_ids.empty? ? [] :
+      mysql.xquery('SELECT id, user, header, created_at FROM memos WHERE id IN (?) ORDER BY created_at DESC, id DESC', memo_ids)
     if memos.count == 0
       halt 404, "404 Not Found"
     end
@@ -210,10 +218,10 @@ class Isucon3App < Sinatra::Base
       params["is_private"].to_i,
       Time.now,
     )
-    if params["is_private"].to_i == 1
-      $cache.incr('memos:count')
-    end
     memo_id = mysql.last_id
+    if params["is_private"].to_i == 0
+      redis.lpush('memo:public:ids', memo_id)
+    end
     redirect "/memo/#{memo_id}"
   end
 
