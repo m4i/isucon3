@@ -1,0 +1,74 @@
+#!/bin/bash
+
+if [[ -z "$WORKLOAD" ]]; then
+  WORKLOAD=4
+fi
+
+ISUCON_HOME=/home/isucon
+BENCHMARK_RESULT_DIR=/tmp/benchmark
+
+NGINX_LOGDIR=/var/log/nginx
+NGINX_LOGS=( access-app.log access-static.log )
+NGINX_PID=/var/run/nginx.pid
+
+MYSQL_LOGDIR=/var/lib/mysql
+MYSQL_LOGS=( mysql-slow.log )
+
+
+if (($# != 1)) || [[ ! "$1" =~ ^benchmark$|^test$ ]]; then
+  echo "Usage: $0 <benchmark|test>" >&2
+  exit 1
+fi
+
+mode=$1
+
+timestamp=$(date +%Y%m%d%H%M%S)
+
+
+# benchmark 開始前にすでにログがあれば access-app.log.bak-YYYYMMDDhhmmss に退避
+for log_file in ${NGINX_LOGS[@]}; do
+  log_path=$NGINX_LOGDIR/$log_file
+  if [[ -s $log_path ]]; then
+    sudo mv $log_path{,.bak-$timestamp}
+  fi
+done
+sudo kill -USR1 $(cat $NGINX_PID)
+
+echo -n $timestamp > /tmp/benchmark-timestamp
+
+
+
+mkdir -p "$BENCHMARK_RESULT_DIR"
+
+args=( $mode --workload $WORKLOAD )
+if [[ $mode = benchmark ]]; then
+  args+=( --init $ISUCON_HOME/webapp/bin/init )
+fi
+
+echo isucon3 "${args[@]}"
+sudo isucon3 "${args[@]}" 2>&1 | tee "$BENCHMARK_RESULT_DIR/$timestamp-$mode.txt"
+
+
+
+
+# benchmark 終了後にログを access-app.log-YYYYMMDDhhmmss に退避
+#
+# ログを見たい時は
+#     ls /var/log/nginx/access-app.log-* | tail -1 | xargs less
+# で OK
+for log_file in ${NGINX_LOGS[@]}; do
+  log_path=$NGINX_LOGDIR/$log_file
+  if [[ -s $log_path ]]; then
+    sudo mv $log_path{,-$timestamp}
+  fi
+done
+sudo kill -USR1 $(cat $NGINX_PID)
+
+# ls /var/lib/mysql/mysql-slow.log-* | tail -1 | xargs sudo mysqldumpslow -s t
+for log_file in ${MYSQL_LOGS[@]}; do
+  log_path=$MYSQL_LOGDIR/$log_file
+  if [[ -s $log_path ]]; then
+    sudo mv $log_path{,-$timestamp}
+  fi
+done
+mysqladmin -uroot -proot flush-logs

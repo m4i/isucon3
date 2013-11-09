@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -e
+
+PREFIX=/usr/local
+VERSION=2.6.16
+
+cd /tmp
+
+if [[ ! -e redis-$VERSION.tar.gz ]]; then
+  curl -O http://download.redis.io/releases/redis-$VERSION.tar.gz
+fi
+
+rm -rf redis-$VERSION
+tar xf redis-$VERSION.tar.gz
+
+cd redis-$VERSION
+
+make
+sudo PREFIX=$PREFIX make install
+
+cd utils
+sudo ./install_server.sh

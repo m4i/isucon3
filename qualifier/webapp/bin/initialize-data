@@ -1,0 +1,3 @@
+#!/bin/bash
+
+time gzip -dc /opt/isucon/data/init.sql.gz | mysql -uisucon isucon
